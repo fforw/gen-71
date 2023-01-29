@@ -1,3 +1,3 @@
 # gen-71
 
-WIP
+Noise space traversal based on connected arcs controlling a Jackson Pollock like drip paintning.

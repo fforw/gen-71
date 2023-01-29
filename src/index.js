@@ -1,7 +1,8 @@
 import domready from "domready"
 import "./style.css"
 import SimplexNoise from "simplex-noise"
-import Color from "./Color"
+import { randomPaletteWithBlack } from "./randomPalette"
+
 
 const PHI = (1 + Math.sqrt(5)) / 2;
 const TAU = Math.PI * 2;
@@ -15,14 +16,9 @@ const config = {
 /**
  * @type CanvasRenderingContext2D
  */
-let ctx;
-let canvas;
-/**
- * @type CanvasRenderingContext2D
- */
-let statsCtx;
-let statsCanvas;
-let noise;
+let ctx
+let canvas
+let noise
 
 class ArcPtr
 {
@@ -39,12 +35,14 @@ class ArcPtr
     pow = 1
     noiseScale = 0
 
-    constructor(x,y,speed, angle = Math.random() * TAU, noiseScale = 0.05)
+    color = "#f00"
+
+    constructor(speed = SPEED, noiseScale = 0.05)
     {
         this.id = Math.random()
         this.speed = speed
         this.noiseScale = noiseScale
-        this.init(x,y,angle)
+        this.init(0,0,Math.random() * TAU)
     }
 
     randomRadius()
@@ -107,6 +105,7 @@ function fract(n)
 
 const SPEED = 10
 let activeRun = 0
+let runLength
 domready(
     () => {
 
@@ -122,68 +121,68 @@ domready(
         canvas.width = width;
         canvas.height = height;
 
-        statsCanvas = document.createElement("canvas")
-        statsCanvas.width = width
-        statsCanvas.height = Math.round(height * 0.25)
-
-        statsCanvas.style.position = "absolute"
-        statsCanvas.style.bottom = "0"
-        statsCanvas.style.left = "0"
-
-        document.body.appendChild(statsCanvas)
-
-        statsCtx = statsCanvas.getContext("2d")
-
-
         const paint = () => {
 
             const curr = ++activeRun
+            runLength = Math.round(500 + Math.random() * 200)
 
-            ctx.fillStyle = "#000";
-            ctx.fillRect(0,0, width, height);
-            statsCtx.clearRect(0,0,width,statsCanvas.height);
+            console.log("RUN #", curr, ", len = ", runLength)
 
             noise = new SimplexNoise()
 
-            const pointers = Array.from({length: 3}).map( () => new ArcPtr(
-                width>>1,
-                height>>1,
-                SPEED,
-            ))
-            const dy = Math.round(height * 0.75)
-            const size = Math.min(width, dy)
-            const dh = statsCanvas.height
 
             const cx = width >> 1
-            const cy = dy >> 1
+            const cy = height >> 1
 
-            const colors = pointers.map((ptr, idx) => Color.fromHSL(fract(PHI * idx), 0.5, 0.5).toRGBHex())
+            let x = cx, y = cy
+
+
+            const count = 100
+
+            const coords = []
+            for (let i = 0; i < count; i++)
+            {
+                coords.push(
+                    Math.random() * width,
+                    Math.random() * height,
+                    0
+                )
+
+            }
+
+            const palette = randomPaletteWithBlack();
+            ctx.fillStyle = palette[0]
+            ctx.fillRect(0,0,width,height)
+
+            const ptrs = Array.from({length: 3 * count}).map((o,i) => new ArcPtr(i % 3 === 2 ? 5 : 1))
+            const colors = Array.from({length: count}).map((o,i) => palette[0|Math.random() * palette.length] )
 
             const animate = () => {
 
-                for (let i = 0; i < pointers.length; i++)
+                for (let i = 0; i < 3; i++)
                 {
-                    let ptr = pointers[i]
+                    for (let j = 0; j < ptrs.length; j += 3)
+                    {
+                        const x = coords[j    ]
+                        const y = coords[j + 1]
+                        const dxPtr = ptrs[j    ]
+                        const dyPtr = ptrs[j + 1]
+                        const  rPtr = ptrs[j + 2]
 
-                    const v = ptr.next()
-                    ctx.fillStyle = colors[i]
-                    ctx.fillRect( ptr.x0, ptr.y0,2,2)
+                        coords[j    ] += dxPtr.next() * 2
+                        coords[j + 1] += dyPtr.next() * 2
 
-                    statsCtx.globalCompositeOperation = "copy"
-                    statsCtx.drawImage(
-                        statsCanvas,
-                        2,0,width - 2, dh,
-                        0,0,width - 2, dh
-                    )
+                        const r = 1 + Math.pow(0.5 + rPtr.next() * 0.5, 5) * 12
 
-                    statsCtx.globalCompositeOperation = "source-over"
-                    statsCtx.clearRect( width - 2, 0,2,dh)
-                    statsCtx.fillStyle = colors[i]
-                    statsCtx.fillRect( width - 2, (0.5 + v * 0.5) * dh,2,2)
+                        ctx.fillStyle = colors[j/3]
+                        ctx.beginPath()
+                        ctx.moveTo(x+r,y)
+                        ctx.arc(x,y,r,0,TAU, true)
+                        ctx.fill()
+                    }
                 }
 
-
-                if (curr === activeRun)
+                if (curr === activeRun && runLength-- > 0)
                 {
                     requestAnimationFrame(animate)
                 }
